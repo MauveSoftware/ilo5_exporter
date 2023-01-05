@@ -51,6 +51,10 @@ func Collect(parentPath string, cl client.Client, ch chan<- prometheus.Metric) e
 	}
 
 	for _, f := range th.Fans {
+		if f.Status.State == "UnavailableOffline" {
+			continue
+		}
+
 		collectForFan(cl.HostName(), &f, ch)
 	}
 

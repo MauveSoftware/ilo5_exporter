@@ -34,10 +34,10 @@ func Describe(ch chan<- *prometheus.Desc) {
 func Collect(parentPath string, cl client.Client, ch chan<- prometheus.Metric, wg *sync.WaitGroup, errCh chan<- error) {
 	defer wg.Done()
 
-	collectStorage(parentPath, cl, ch, wg, errCh)
+	collectStorage(parentPath, cl, ch, errCh)
 }
 
-func collectStorage(parentPath string, cl client.Client, ch chan<- prometheus.Metric, wg *sync.WaitGroup, errCh chan<- error) {
+func collectStorage(parentPath string, cl client.Client, ch chan<- prometheus.Metric, errCh chan<- error) {
 	p := parentPath + "/Storage"
 	crtls := common.MemberList{}
 
@@ -47,14 +47,12 @@ func collectStorage(parentPath string, cl client.Client, ch chan<- prometheus.Me
 		return
 	}
 
-	wg.Add(len(crtls.Members))
-
 	for _, l := range crtls.Members {
-		go collectStorageController(l.Path, cl, ch, wg, errCh)
+		collectStorageController(l.Path, cl, ch, errCh)
 	}
 }
 
-func collectStorageController(path string, cl client.Client, ch chan<- prometheus.Metric, wg *sync.WaitGroup, errCh chan<- error) {
+func collectStorageController(path string, cl client.Client, ch chan<- prometheus.Metric, errCh chan<- error) {
 	strg := StorageInfo{}
 
 	err := cl.Get(path, &strg)
@@ -63,16 +61,12 @@ func collectStorageController(path string, cl client.Client, ch chan<- prometheu
 		return
 	}
 
-	wg.Add(len(strg.Drives))
-
 	for _, drv := range strg.Drives {
-		go collectDiskDrive(drv.Path, cl, ch, wg, errCh)
+		collectDiskDrive(drv.Path, cl, ch, errCh)
 	}
 }
 
-func collectDiskDrive(path string, cl client.Client, ch chan<- prometheus.Metric, wg *sync.WaitGroup, errCh chan<- error) {
-	defer wg.Done()
-
+func collectDiskDrive(path string, cl client.Client, ch chan<- prometheus.Metric, errCh chan<- error) {
 	d := DiskDrive{}
 	err := cl.Get(path, &d)
 	if err != nil {

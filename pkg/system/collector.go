@@ -59,7 +59,7 @@ func (c *collector) Collect(ch chan<- prometheus.Metric) {
 	doneCh := make(chan interface{})
 	errCh := make(chan error)
 
-	wg.Add(2)
+	wg.Add(3)
 
 	go func() {
 		wg.Wait()

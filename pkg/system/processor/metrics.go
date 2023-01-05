@@ -53,16 +53,12 @@ func Collect(parentPath string, cl client.Client, ch chan<- prometheus.Metric, w
 
 	ch <- prometheus.MustNewConstMetric(countDesc, prometheus.GaugeValue, float64(len(procs.Members)), cl.HostName())
 
-	wg.Add(len(procs.Members))
-
 	for _, l := range procs.Members {
-		go collectForProcessor(l.Path, cl, ch, wg, errCh)
+		collectForProcessor(l.Path, cl, ch, errCh)
 	}
 }
 
-func collectForProcessor(link string, cl client.Client, ch chan<- prometheus.Metric, wg *sync.WaitGroup, errCh chan<- error) {
-	defer wg.Done()
-
+func collectForProcessor(link string, cl client.Client, ch chan<- prometheus.Metric, errCh chan<- error) {
 	pr := Processor{}
 	err := cl.Get(link, &pr)
 	if err != nil {
