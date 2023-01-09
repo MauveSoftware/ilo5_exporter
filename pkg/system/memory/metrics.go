@@ -76,6 +76,10 @@ func collectForDIMM(link string, cl client.Client, ch chan<- prometheus.Metric, 
 
 	l := []string{cl.HostName(), d.Name}
 
+	if d.Status.State == "" {
+		return
+	}
+
 	ch <- prometheus.MustNewConstMetric(dimmHealthyDesc, prometheus.GaugeValue, d.Status.HealthValue(), l...)
 	ch <- prometheus.MustNewConstMetric(dimmSizeDesc, prometheus.GaugeValue, float64(d.SizeMB<<20), l...)
 }

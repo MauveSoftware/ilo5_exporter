@@ -15,7 +15,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const version string = "0.0.2"
+const version string = "0.0.3"
 
 var (
 	showVersion           = flag.Bool("version", false, "Print version information.")
@@ -94,7 +94,7 @@ func handleMetricsRequest(w http.ResponseWriter, r *http.Request) error {
 
 	reg := prometheus.NewRegistry()
 
-	cl := client.NewClient(host, *username, *password, client.WithMaxConcurrentRequests(*maxConcurrentRequests), client.WithInsecure())
+	cl := client.NewClient(host, *username, *password, client.WithMaxConcurrentRequests(*maxConcurrentRequests), client.WithInsecure(), client.WithDebug())
 	reg.MustRegister(system.NewCollector(cl))
 	reg.MustRegister(chassis.NewCollector(cl))
 
