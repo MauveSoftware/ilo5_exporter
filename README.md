@@ -22,7 +22,7 @@ Password: g3tM3trics
 
 ### Docker
 ```bash
-docker run -d --restart always --name ilo5_exporter -p 9545:9545 -e API_USERNAME=ilo5_exporter -e API_PASSWORD=g3tM3trics mauvesoftware/ilo5_exporter
+docker run -d --restart always --name ilo5_exporter -p 19545:19545 -e API_USERNAME=ilo5_exporter -e API_PASSWORD=g3tM3trics mauvesoftware/ilo5_exporter
 ```
 
 ## Prometheus configuration
