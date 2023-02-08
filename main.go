@@ -19,7 +19,7 @@ const version string = "0.0.3"
 
 var (
 	showVersion           = flag.Bool("version", false, "Print version information.")
-	listenAddress         = flag.String("web.listen-address", ":9545", "Address on which to expose metrics and web interface.")
+	listenAddress         = flag.String("web.listen-address", ":19545", "Address on which to expose metrics and web interface.")
 	metricsPath           = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
 	username              = flag.String("api.username", "", "Username")
 	password              = flag.String("api.password", "", "Password")
