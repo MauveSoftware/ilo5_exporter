@@ -73,7 +73,7 @@ func Collect(parentPath string, cc *common.CollectorContext) {
 func collectForDIMM(ctx context.Context, link string, cc *common.CollectorContext) {
 	defer cc.WaitGroup().Done()
 
-	ctx, span := cc.Tracer().Start(ctx, "Memory.Collect", trace.WithAttributes(
+	ctx, span := cc.Tracer().Start(ctx, "Memory.CollectForDIMM", trace.WithAttributes(
 		attribute.String("path", link),
 	))
 	defer span.End()
