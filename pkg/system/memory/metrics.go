@@ -6,9 +6,9 @@ package memory
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
@@ -59,7 +59,7 @@ func Collect(parentPath string, cc *common.CollectorContext) {
 
 	err := cc.Client().Get(ctx, p, &mem)
 	if err != nil {
-		cc.HandleError(errors.Wrap(err, "could not get memory summary"), span)
+		cc.HandleError(fmt.Errorf("could not get memory summary: %w", err), span)
 		return
 	}
 
@@ -84,7 +84,7 @@ func collectForDIMM(ctx context.Context, link string, cc *common.CollectorContex
 	d := MemoryDIMM{}
 	err := cc.Client().Get(ctx, p, &d)
 	if err != nil {
-		cc.HandleError(errors.Wrapf(err, "could not get memory information from %s", link), span)
+		cc.HandleError(fmt.Errorf("could not get memory information from %s: %w", link, err), span)
 		return
 	}
 

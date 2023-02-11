@@ -3,7 +3,6 @@ module github.com/MauveSoftware/ilo5_exporter
 go 1.20
 
 require (
-	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.14.0
 	github.com/sirupsen/logrus v1.9.0
 	go.opentelemetry.io/otel v1.13.0

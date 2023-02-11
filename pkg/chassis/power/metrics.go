@@ -6,9 +6,9 @@ package power
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/MauveSoftware/ilo5_exporter/pkg/common"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -61,7 +61,7 @@ func Collect(ctx context.Context, parentPath string, cc *common.CollectorContext
 	pwr := Power{}
 	err := cc.Client().Get(ctx, parentPath+"/Power", &pwr)
 	if err != nil {
-		cc.HandleError(errors.Wrap(err, "could not get power data"), span)
+		cc.HandleError(fmt.Errorf("could not get power data: %w", err), span)
 	}
 
 	l := []string{cc.Client().HostName()}

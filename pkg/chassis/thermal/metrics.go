@@ -6,9 +6,9 @@ package thermal
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/MauveSoftware/ilo5_exporter/pkg/common"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -59,7 +59,7 @@ func Collect(ctx context.Context, parentPath string, cc *common.CollectorContext
 	th := Thermal{}
 	err := cc.Client().Get(ctx, parentPath+"/Thermal", &th)
 	if err != nil {
-		cc.HandleError(errors.Wrap(err, "could not get thermal data"), span)
+		cc.HandleError(fmt.Errorf("could not get thermal data: %w", err), span)
 	}
 
 	hostname := cc.Client().HostName()

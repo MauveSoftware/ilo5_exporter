@@ -6,9 +6,9 @@ package storage
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/MauveSoftware/ilo5_exporter/pkg/common"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -49,7 +49,7 @@ func Collect(parentPath string, cc *common.CollectorContext) {
 
 	err := cc.Client().Get(ctx, p, &crtls)
 	if err != nil {
-		cc.HandleError(errors.Wrap(err, "could not get storage controller summary"), span)
+		cc.HandleError(fmt.Errorf("could not get storage controller summary: %w", err), span)
 		return
 	}
 
@@ -67,7 +67,7 @@ func collectStorageController(ctx context.Context, path string, cc *common.Colle
 	strg := StorageInfo{}
 	err := cc.Client().Get(ctx, path, &strg)
 	if err != nil {
-		cc.HandleError(errors.Wrap(err, "could not get storage controller summary"), span)
+		cc.HandleError(fmt.Errorf("could not get storage controller summary: %w", err), span)
 		return
 	}
 
@@ -85,7 +85,7 @@ func collectDiskDrive(ctx context.Context, path string, cc *common.CollectorCont
 	d := DiskDrive{}
 	err := cc.Client().Get(ctx, path, &d)
 	if err != nil {
-		cc.HandleError(errors.Wrapf(err, "could not get drive information from %s", path), span)
+		cc.HandleError(fmt.Errorf("could not get drive information from %s: %w", path, err), span)
 		return
 	}
 

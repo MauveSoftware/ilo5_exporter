@@ -6,10 +6,10 @@ package processor
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/MauveSoftware/ilo5_exporter/pkg/common"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -57,7 +57,7 @@ func Collect(parentPath string, cc *common.CollectorContext) {
 	procs := common.MemberList{}
 	err := cc.Client().Get(ctx, p, &procs)
 	if err != nil {
-		cc.HandleError(errors.Wrap(err, "could not get processor summary"), span)
+		cc.HandleError(fmt.Errorf("could not get processor summary: %w", err), span)
 		return
 	}
 
@@ -79,7 +79,7 @@ func collectForProcessor(ctx context.Context, link string, cc *common.CollectorC
 	pr := Processor{}
 	err := cc.Client().Get(ctx, link, &pr)
 	if err != nil {
-		cc.HandleError(errors.Wrapf(err, "could not get processor information from %s", link), span)
+		cc.HandleError(fmt.Errorf("could not get processor information from %s: %w", link, err), span)
 		return
 	}
 
