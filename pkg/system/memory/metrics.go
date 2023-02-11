@@ -5,12 +5,13 @@
 package memory
 
 import (
+	"context"
+	"fmt"
 	"strings"
-	"sync"
 
-	"github.com/pkg/errors"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
-	"github.com/MauveSoftware/ilo5_exporter/pkg/client"
 	"github.com/MauveSoftware/ilo5_exporter/pkg/common"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -45,45 +46,56 @@ func Describe(ch chan<- *prometheus.Desc) {
 }
 
 // Collect collects metrics for memory modules
-func Collect(parentPath string, cl client.Client, ch chan<- prometheus.Metric, wg *sync.WaitGroup, errCh chan<- error) {
-	defer wg.Done()
+func Collect(parentPath string, cc *common.CollectorContext) {
+	defer cc.WaitGroup().Done()
+
+	ctx, span := cc.Tracer().Start(cc.RootCtx(), "Memory.Collect", trace.WithAttributes(
+		attribute.String("parent_path", parentPath),
+	))
+	defer span.End()
 
 	p := parentPath + "/Memory"
 	mem := common.MemberList{}
 
-	err := cl.Get(p, &mem)
+	err := cc.Client().Get(ctx, p, &mem)
 	if err != nil {
-		errCh <- errors.Wrap(err, "could not get memory summary")
+		cc.HandleError(fmt.Errorf("could not get memory summary: %w", err), span)
 		return
 	}
 
-	wg.Add(len(mem.Members))
+	cc.WaitGroup().Add(len(mem.Members))
 
 	for _, m := range mem.Members {
-		go collectForDIMM(m.Path, cl, ch, wg, errCh)
+		go collectForDIMM(ctx, m.Path, cc)
 	}
 }
 
-func collectForDIMM(link string, cl client.Client, ch chan<- prometheus.Metric, wg *sync.WaitGroup, errCh chan<- error) {
-	defer wg.Done()
+func collectForDIMM(ctx context.Context, link string, cc *common.CollectorContext) {
+	defer cc.WaitGroup().Done()
+
+	ctx, span := cc.Tracer().Start(ctx, "Memory.Collect", trace.WithAttributes(
+		attribute.String("path", link),
+	))
+	defer span.End()
 
 	i := strings.Index(link, "Systems/")
 	p := link[i:]
 
 	d := MemoryDIMM{}
-
-	err := cl.Get(p, &d)
+	err := cc.Client().Get(ctx, p, &d)
 	if err != nil {
-		errCh <- errors.Wrapf(err, "could not get memory information from %s", link)
+		cc.HandleError(fmt.Errorf("could not get memory information from %s: %w", link, err), span)
 		return
 	}
 
-	l := []string{cl.HostName(), d.Name}
+	l := []string{cc.Client().HostName(), d.Name}
 
 	if d.Status.State == "" {
 		return
 	}
 
-	ch <- prometheus.MustNewConstMetric(dimmHealthyDesc, prometheus.GaugeValue, d.Status.HealthValue(), l...)
-	ch <- prometheus.MustNewConstMetric(dimmSizeDesc, prometheus.GaugeValue, float64(d.SizeMB<<20), l...)
+	cc.RecordMetrics(
+		prometheus.MustNewConstMetric(dimmHealthyDesc, prometheus.GaugeValue, d.Status.HealthValue(), l...),
+		prometheus.MustNewConstMetric(dimmSizeDesc, prometheus.GaugeValue, float64(d.SizeMB<<20), l...),
+	)
 }

@@ -5,13 +5,14 @@
 package processor
 
 import (
+	"context"
+	"fmt"
 	"strings"
-	"sync"
 
-	"github.com/MauveSoftware/ilo5_exporter/pkg/client"
 	"github.com/MauveSoftware/ilo5_exporter/pkg/common"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -44,34 +45,48 @@ func Describe(ch chan<- *prometheus.Desc) {
 }
 
 // Collect collects processor metrics
-func Collect(parentPath string, cl client.Client, ch chan<- prometheus.Metric, wg *sync.WaitGroup, errCh chan<- error) {
-	defer wg.Done()
+func Collect(parentPath string, cc *common.CollectorContext) {
+	defer cc.WaitGroup().Done()
+
+	ctx, span := cc.Tracer().Start(cc.RootCtx(), "Processor.Collect", trace.WithAttributes(
+		attribute.String("parent_path", parentPath),
+	))
+	defer span.End()
 
 	p := parentPath + "/Processors"
 	procs := common.MemberList{}
-	err := cl.Get(p, &procs)
+	err := cc.Client().Get(ctx, p, &procs)
 	if err != nil {
-		errCh <- errors.Wrap(err, "could not get processor summary")
+		cc.HandleError(fmt.Errorf("could not get processor summary: %w", err), span)
 		return
 	}
 
-	ch <- prometheus.MustNewConstMetric(countDesc, prometheus.GaugeValue, float64(len(procs.Members)), cl.HostName())
+	cc.RecordMetrics(
+		prometheus.MustNewConstMetric(countDesc, prometheus.GaugeValue, float64(len(procs.Members)), cc.Client().HostName()),
+	)
 
 	for _, l := range procs.Members {
-		collectForProcessor(l.Path, cl, ch, errCh)
+		collectForProcessor(ctx, l.Path, cc)
 	}
 }
 
-func collectForProcessor(link string, cl client.Client, ch chan<- prometheus.Metric, errCh chan<- error) {
+func collectForProcessor(ctx context.Context, link string, cc *common.CollectorContext) {
+	ctx, span := cc.Tracer().Start(ctx, "Storage.CollectProcessor", trace.WithAttributes(
+		attribute.String("path", link),
+	))
+	defer span.End()
+
 	pr := Processor{}
-	err := cl.Get(link, &pr)
+	err := cc.Client().Get(ctx, link, &pr)
 	if err != nil {
-		errCh <- errors.Wrapf(err, "could not get processor information from %s", link)
+		cc.HandleError(fmt.Errorf("could not get processor information from %s: %w", link, err), span)
 		return
 	}
 
-	l := []string{cl.HostName(), pr.Socket, strings.Trim(pr.Model, " ")}
-	ch <- prometheus.MustNewConstMetric(coresDesc, prometheus.GaugeValue, pr.TotalCores, l...)
-	ch <- prometheus.MustNewConstMetric(threadsDesc, prometheus.GaugeValue, pr.TotalThreads, l...)
-	ch <- prometheus.MustNewConstMetric(healthyDesc, prometheus.GaugeValue, pr.Status.HealthValue(), l...)
+	l := []string{cc.Client().HostName(), pr.Socket, strings.Trim(pr.Model, " ")}
+	cc.RecordMetrics(
+		prometheus.MustNewConstMetric(coresDesc, prometheus.GaugeValue, pr.TotalCores, l...),
+		prometheus.MustNewConstMetric(threadsDesc, prometheus.GaugeValue, pr.TotalThreads, l...),
+		prometheus.MustNewConstMetric(healthyDesc, prometheus.GaugeValue, pr.Status.HealthValue(), l...),
+	)
 }
