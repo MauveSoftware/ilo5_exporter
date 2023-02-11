@@ -5,9 +5,13 @@
 package power
 
 import (
-	"github.com/MauveSoftware/ilo5_exporter/pkg/client"
+	"context"
+
+	"github.com/MauveSoftware/ilo5_exporter/pkg/common"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -48,23 +52,29 @@ func Describe(ch chan<- *prometheus.Desc) {
 	ch <- powerSupplyEnabledDesc
 }
 
-func Collect(parentPath string, cl client.Client, ch chan<- prometheus.Metric) error {
-	pwr := Power{}
+func Collect(ctx context.Context, parentPath string, cc *common.CollectorContext) {
+	ctx, span := cc.Tracer().Start(ctx, "Power.Collect", trace.WithAttributes(
+		attribute.String("parent_path", parentPath),
+	))
+	defer span.End()
 
-	err := cl.Get(parentPath+"/Power", &pwr)
+	pwr := Power{}
+	err := cc.Client().Get(ctx, parentPath+"/Power", &pwr)
 	if err != nil {
-		return errors.Wrap(err, "could not get power data")
+		cc.HandleError(errors.Wrap(err, "could not get power data"), span)
 	}
 
-	l := []string{cl.HostName()}
+	l := []string{cc.Client().HostName()}
 
 	for _, pwc := range pwr.PowerControl {
 		la := append(l, pwc.ID)
-		ch <- prometheus.MustNewConstMetric(powerCurrentDesc, prometheus.GaugeValue, pwc.PowerConsumedWatts, la...)
-		ch <- prometheus.MustNewConstMetric(powerAvgDesc, prometheus.GaugeValue, pwc.Metrics.AverageConsumedWatts, la...)
-		ch <- prometheus.MustNewConstMetric(powerMinDesc, prometheus.GaugeValue, pwc.Metrics.MinConsumedWatts, la...)
-		ch <- prometheus.MustNewConstMetric(powerMaxDesc, prometheus.GaugeValue, pwc.Metrics.MaxConsumedWatts, la...)
-		ch <- prometheus.MustNewConstMetric(powerCapacityDesc, prometheus.GaugeValue, pwc.PowerCapacityWatts, la...)
+		cc.RecordMetrics(
+			prometheus.MustNewConstMetric(powerCurrentDesc, prometheus.GaugeValue, pwc.PowerConsumedWatts, la...),
+			prometheus.MustNewConstMetric(powerAvgDesc, prometheus.GaugeValue, pwc.Metrics.AverageConsumedWatts, la...),
+			prometheus.MustNewConstMetric(powerMinDesc, prometheus.GaugeValue, pwc.Metrics.MinConsumedWatts, la...),
+			prometheus.MustNewConstMetric(powerMaxDesc, prometheus.GaugeValue, pwc.Metrics.MaxConsumedWatts, la...),
+			prometheus.MustNewConstMetric(powerCapacityDesc, prometheus.GaugeValue, pwc.PowerCapacityWatts, la...),
+		)
 	}
 
 	for _, sup := range pwr.PowerSupplies {
@@ -73,9 +83,9 @@ func Collect(parentPath string, cl client.Client, ch chan<- prometheus.Metric) e
 		}
 
 		la := append(l, sup.SerialNumber)
-		ch <- prometheus.MustNewConstMetric(powerSupplyEnabledDesc, prometheus.GaugeValue, sup.Status.EnabledValue(), la...)
-		ch <- prometheus.MustNewConstMetric(powerSupplyHealthyDesc, prometheus.GaugeValue, sup.Status.HealthValue(), la...)
+		cc.RecordMetrics(
+			prometheus.MustNewConstMetric(powerSupplyEnabledDesc, prometheus.GaugeValue, sup.Status.EnabledValue(), la...),
+			prometheus.MustNewConstMetric(powerSupplyHealthyDesc, prometheus.GaugeValue, sup.Status.HealthValue(), la...),
+		)
 	}
-
-	return nil
 }

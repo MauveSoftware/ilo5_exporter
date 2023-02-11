@@ -5,12 +5,13 @@
 package storage
 
 import (
-	"sync"
+	"context"
 
-	"github.com/MauveSoftware/ilo5_exporter/pkg/client"
 	"github.com/MauveSoftware/ilo5_exporter/pkg/common"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -35,50 +36,62 @@ func Describe(ch chan<- *prometheus.Desc) {
 }
 
 // Collect collects metrics for storage controllers
-func Collect(parentPath string, cl client.Client, ch chan<- prometheus.Metric, wg *sync.WaitGroup, errCh chan<- error) {
-	defer wg.Done()
+func Collect(parentPath string, cc *common.CollectorContext) {
+	defer cc.WaitGroup().Done()
 
-	collectStorage(parentPath, cl, ch, errCh)
-}
+	ctx, span := cc.Tracer().Start(cc.RootCtx(), "Storage.Collect", trace.WithAttributes(
+		attribute.String("parent_path", parentPath),
+	))
+	defer span.End()
 
-func collectStorage(parentPath string, cl client.Client, ch chan<- prometheus.Metric, errCh chan<- error) {
 	p := parentPath + "/Storage"
 	crtls := common.MemberList{}
 
-	err := cl.Get(p, &crtls)
+	err := cc.Client().Get(ctx, p, &crtls)
 	if err != nil {
-		errCh <- errors.Wrap(err, "could not get storage controller summary")
+		cc.HandleError(errors.Wrap(err, "could not get storage controller summary"), span)
 		return
 	}
 
 	for _, l := range crtls.Members {
-		collectStorageController(l.Path, cl, ch, errCh)
+		collectStorageController(ctx, l.Path, cc)
 	}
 }
 
-func collectStorageController(path string, cl client.Client, ch chan<- prometheus.Metric, errCh chan<- error) {
-	strg := StorageInfo{}
+func collectStorageController(ctx context.Context, path string, cc *common.CollectorContext) {
+	ctx, span := cc.Tracer().Start(ctx, "Storage.CollectController", trace.WithAttributes(
+		attribute.String("path", path),
+	))
+	defer span.End()
 
-	err := cl.Get(path, &strg)
+	strg := StorageInfo{}
+	err := cc.Client().Get(ctx, path, &strg)
 	if err != nil {
-		errCh <- errors.Wrap(err, "could not get storage controller summary")
+		cc.HandleError(errors.Wrap(err, "could not get storage controller summary"), span)
 		return
 	}
 
 	for _, drv := range strg.Drives {
-		collectDiskDrive(drv.Path, cl, ch, errCh)
+		collectDiskDrive(ctx, drv.Path, cc)
 	}
 }
 
-func collectDiskDrive(path string, cl client.Client, ch chan<- prometheus.Metric, errCh chan<- error) {
+func collectDiskDrive(ctx context.Context, path string, cc *common.CollectorContext) {
+	ctx, span := cc.Tracer().Start(ctx, "Storage.CollectDisk", trace.WithAttributes(
+		attribute.String("path", path),
+	))
+	defer span.End()
+
 	d := DiskDrive{}
-	err := cl.Get(path, &d)
+	err := cc.Client().Get(ctx, path, &d)
 	if err != nil {
-		errCh <- errors.Wrapf(err, "could not get drive information from %s", path)
+		cc.HandleError(errors.Wrapf(err, "could not get drive information from %s", path), span)
 		return
 	}
 
-	l := []string{cl.HostName(), d.LocationString(), d.Model, d.MediaType}
-	ch <- prometheus.MustNewConstMetric(diskDriveCapacityDesc, prometheus.GaugeValue, float64(d.CapacityBytes), l...)
-	ch <- prometheus.MustNewConstMetric(diskDriveHealthyDesc, prometheus.GaugeValue, d.Status.HealthValue(), l...)
+	l := []string{cc.Client().HostName(), d.LocationString(), d.Model, d.MediaType}
+	cc.RecordMetrics(
+		prometheus.MustNewConstMetric(diskDriveCapacityDesc, prometheus.GaugeValue, float64(d.CapacityBytes), l...),
+		prometheus.MustNewConstMetric(diskDriveHealthyDesc, prometheus.GaugeValue, d.Status.HealthValue(), l...),
+	)
 }
