@@ -7,7 +7,8 @@ FROM alpine:latest
 ENV API_USERNAME ''
 ENV API_PASSWORD ''
 ENV API_MAX_CONCURRENT '4'
+ENV CMD_FLAGS ''
 RUN apk --no-cache add ca-certificates bash
 COPY --from=builder /go/bin/ilo5_exporter /app/ilo5_exporter
 EXPOSE 19545
-ENTRYPOINT /app/ilo5_exporter -api.username=$API_USERNAME -api.password=$API_PASSWORD -api.max-concurrent-requests=$API_MAX_CONCURRENT
+ENTRYPOINT /app/ilo5_exporter -api.username=$API_USERNAME -api.password=$API_PASSWORD -api.max-concurrent-requests=$API_MAX_CONCURRENT $CMD_FLAGS
